@@ -88,6 +88,9 @@ desktop.ini
 *.pid
 *.seed
 
+# 探针证据运行期数据集（分站点证据批次与模板证据清单）
+backend/data/
+
 # BEGIN S11 LOCAL SNAPSHOT EXCLUSIONS
 **/.git/**
 **/.hg/**

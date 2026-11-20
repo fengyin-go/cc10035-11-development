@@ -16,9 +16,14 @@
 │   └── vite.config.ts        dev server 配置（open: false）
 ├── backend/                  FastAPI（Python） 后端
 │   ├── app/routers/resource.py  通用查询/导出/登记/动作接口
+│   ├── app/routers/probe_evidence.py  探针证据专用接口（试跑/许可/数据集/清单/发布闸口）
 │   ├── app/services/<key>.py    每个模块独立领域逻辑
+│   ├── app/probe_evidence/      分站点探针证据与采样许可领域（见该目录 README）
 │   ├── app/services/base.py     共享服务骨架
-│   └── app/store.py          内存数据仓库与示例数据
+│   ├── app/store.py          内存数据仓库与示例数据
+│   ├── tests/                探针证据单元/并发/持久化/HTTP 测试（40 例）
+│   ├── scripts/scenario_demo.py  甲乙两站同页端到端场景回放
+│   └── run_tests.py          隔离模式测试入口
 ├── .gitignore
 └── docker-compose.yml
 ```
@@ -34,6 +39,14 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
 健康检查：`curl http://127.0.0.1:8000/api/health`
+
+探针证据领域的端到端场景回放与测试（无需启动服务，使用临时数据集）：
+
+```bash
+cd backend
+python3 -I scripts/scenario_demo.py   # 甲乙两站同页试跑/许可拦截/并发合批/补许可回查
+python3 -I run_tests.py               # 40 个测试用例
+```
 
 ### 前端
 
@@ -76,6 +89,24 @@ npm run dev
   `frontend/src/domain/<模块>.ts`，用于承载真实业务差异并维持36题位容量。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+
+## 探针证据：分站点采样归属与许可校验
+
+模板规则之外新增独立领域 `app/probe_evidence/` 与前端「探针证据」工作台
+（路由 `/probe-evidence`），补齐模板采样页面的数据归属与可用字段校验能力：
+
+- **同页多站**：同一采样页（`page_id@sample_version`）可被甲乙两站模板引用，
+  采样页目录只做归属/可用字段校验，证据按发起站点分数据集存储、互不可见。
+- **站点 × 字段许可**：许可版本化、只追加；超出权限的字段原值在探针处拦截，
+  证据只登记 `待许可` 状态而不带原值。
+- **并发合批**：同站点 + 同样本版本 + 同许可版本的并发请求只产出一批站点证据，
+  批次固化采样时确认的许可版本与授权快照，批次不可变。
+- **模板证据清单**：试跑结果回写清单，逐字段登记实际交付原值、选择器、
+  样本出处（批次号、样本引用、许可版本），按 (模板, 批次, 字段) 幂等。
+- **发布闸口**：维护者用实际采到的字段核对选择器；补许可前即可区分
+  `已采证`（可发布）与 `待许可/未命中/样本缺字段`（未验收），跨站点证据不能放行。
+- 许可变更后重跑产生引用新许可版本的新批次，旧批次保留，可随时回查其归属与
+  当时已交付字段。详见 `backend/app/probe_evidence/README.md`。
 
 领域：数据工程
 子方向：数据采集、爬虫与RPA
